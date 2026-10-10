@@ -173,9 +173,8 @@ def main():
     tangent = np.concatenate([np.gradient(r['xy'], axis=0) if len(r['xy']) > 1 else np.ones((1, 2)) for r in routes])
     irn = query_all(IRN, {'where': '1=1', 'outFields': 'ELEVATION', 'outSR': 2326}, 'irn-hk')
     lv = levels(xy, tangent, irn)
-    g = [dtm.lowest(x, y) for x, y in xy]
-    z = np.array([dtm.height(x, y) if l >= 1 else gg for (x, y), l, gg in zip(xy, lv, g)], dtype=object)
-    rise = [0 if zz is None or gg is None else max(0.0, zz - gg) for zz, gg in zip(z, g)]
+    zr = [dtm.place(x, y, l >= 1) for (x, y), l in zip(xy, lv)]          # the one height rule (dtm.place)
+    z = np.array([a for a, _ in zr], dtype=object); rise = [b for _, b in zr]
     i = 0
     for r in routes: n = len(r['xy']); r['lv'], r['z'], r['rise'] = lv[i:i + n], z[i:i + n], rise[i:i + n]; i += n
     print('levels and heights done', file=sys.stderr, flush=True)

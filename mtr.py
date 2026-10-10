@@ -70,8 +70,8 @@ def z_along(coords, levels):
         for dd, l in levels:
             if dd > d: break
             lv = l
-        g = dtm.lowest(x, y); h = g if lv < 0 else dtm.height(x, y)
-        out.append((None if h is None else round(h, 1), 0 if h is None or g is None else round(max(0.0, h - g), 1)))
+        h, rise = dtm.place(x, y, lv >= 0)                               # over ground: the deck or viaduct; underground: the ground
+        out.append((None if h is None else round(h, 1), 0 if h is None else round(rise, 1)))
     return out
 
 def main(area):

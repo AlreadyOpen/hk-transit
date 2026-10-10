@@ -58,6 +58,17 @@ def lowest(E, N, r_m=15):
     w = w[w != -32768]
     return float(w.min()) / 10 if w.size else None
 
+def place(E, N, deck, r_m=15):
+    """The one height rule for a point the map sets on the ground (map-of-middle-earth lesson 1; the page's side is
+    gis/src/ground.ts): (z, rise) in m. On a deck or over ground (deck true: a road on a TD centreline with ELEVATION >= 1, an
+    MTR line not underground, a lamp post on a deck road) z = the DTM at the point (its top surface: the deck) and rise = its
+    height over the lowest ground within 15 m; else (the street, underground) z = the lowest ground within r_m and rise 0.
+    z is None where the DTM has no data (rise is then 0)."""
+    g = lowest(E, N, 15 if deck else r_m)
+    if not deck: return g, 0.0
+    h = height(E, N)
+    return h, 0.0 if h is None or g is None else max(0.0, h - g)
+
 def tiles(zmin=8, zmax=14):
     """MapLibre raster-dem tiles (Terrarium PNG, 256 px) of the DTM over HK in out/gis/hk/terrain/{z}/{x}/{y}.png, for the
     map's own terrain (gis-page ?terrain=1). Sea and no data are 0 mPD."""
