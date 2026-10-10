@@ -1,0 +1,47 @@
+# Daily bake of Hong Kong's bus and minibus routes and stops, published to Hugging Face (publish.py).
+# Each run commits status/last-run.json: GitHub turns schedules off after 60 days with no commits.
+name: bake
+on:
+  schedule:
+    - cron: '30 19 * * *'          # 03:30 HKT
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: bake
+  cancel-in-progress: false
+jobs:
+  bake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      HKT_DATA: ${{ github.workspace }}/data
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97   # v7.0.0
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: pip install -r requirements.txt
+      # downloads kept between runs: the DTM grid (245 MB, built once) and bus.py's stop positions (fetched once per new stop)
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+        with:
+          path: data/cache
+          key: cache-${{ github.run_id }}
+          restore-keys: cache-
+      - name: bake
+        run: |
+          python dtm.py 835000 820000
+          python bus.py
+          python search.py
+      - name: publish
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python publish.py | tee status/last-run.json
+      - name: keep-alive commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add status/last-run.json
+          git commit -m "bake $(date -u +%F)" || exit 0
+          git push

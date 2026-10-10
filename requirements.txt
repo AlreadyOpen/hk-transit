@@ -1,0 +1,5 @@
+numpy==2.3.5
+shapely==2.1.2
+pyproj==3.7.2
+duckdb==1.4.5
+huggingface_hub==1.12.0
