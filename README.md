@@ -27,6 +27,10 @@ python publish.py             # -> Hugging Face (needs HF_TOKEN)
 
 `HKT_DATA` moves the data folder. The GitHub Action `.github/workflows/bake.yml` runs them all daily.
 
+Before uploading, `publish.py` writes `manifest.json` (sha256 and size of every file, counts, and the sources from
+`sources.json`) and stops if a count drops more than 10% against the published manifest (`manifest.py`; a manual run with
+"force" overrides a drop checked by hand). `check.py` runs on every push (`.github/workflows/check.yml`): no data, no token.
+
 `certs/` holds one public certificate, the Hongkong Post intermediate that `open.hkmapservice.gov.hk` does not send; `mtr.py`
 verifies the iB5000 downloads against certifi's roots plus it (it expires 2032-06-03).
 

@@ -1,0 +1,11 @@
+[
+ {"name": "Bus Route (CSDI)", "owner": "Transport Department", "url": "https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_1638844988873_41214/FeatureServer/0", "licence": "https://portal.csdi.gov.hk/csdi-webpage/doc/TNC", "used_by": "bus.py"},
+ {"name": "Green Minibus Route (CSDI)", "owner": "Transport Department", "url": "https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_1697082463580_57453/FeatureServer/0", "licence": "https://portal.csdi.gov.hk/csdi-webpage/doc/TNC", "used_by": "bus.py"},
+ {"name": "Intelligent Road Network centrelines, ELEVATION (CSDI)", "owner": "Transport Department", "url": "https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_1638949160594_2844/FeatureServer/10", "licence": "https://portal.csdi.gov.hk/csdi-webpage/doc/TNC", "used_by": "bus.py"},
+ {"name": "Green minibus routes and fares GeoJSON", "owner": "Transport Department", "url": "https://static.data.gov.hk/td/routes-fares-geojson/JSON_GMB.json", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "bus.py"},
+ {"name": "KMB/LWB routes, route-stops and stops", "owner": "KMB/LWB", "url": "https://data.etabus.gov.hk/v1/transport/kmb", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "bus.py"},
+ {"name": "Citybus routes, route-stops and stops", "owner": "Citybus", "url": "https://rt.data.gov.hk/v2/transport/citybus", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "bus.py"},
+ {"name": "5 m Digital Terrain Model", "owner": "Lands Department", "url": "https://www.landsd.gov.hk/landsd_psi_data/SMO/data/Whole_HK_DTM_5m.zip", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "dtm.py"},
+ {"name": "iB5000 sheets: RailLine, POIPoint (CSDI index)", "owner": "Lands Department", "url": "https://portal.csdi.gov.hk/server/rest/services/common/landsd_rcd_1637224243141_96556/FeatureServer/0", "licence": "https://portal.csdi.gov.hk/csdi-webpage/doc/TNC", "used_by": "mtr.py"},
+ {"name": "MTR lines and stations", "owner": "MTR Corporation", "url": "https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "mtr.py"}
+]
