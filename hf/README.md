@@ -27,6 +27,9 @@ and every route direction and MTR line, rebuilt daily by [AlreadyOpen/hk-transit
 - `search/routes.parquet`: `key, co, route, bound, dest, stops, lon, lat` (one row per route direction; lon/lat = middle of its stops)
 - `search/search.duckdb`: a view-only DuckDB file over the two Parquet files
 
+A copy is mirrored to [Kaggle](https://www.kaggle.com/datasets/helenkwok/hk-transit) after every bake; Kaggle stores the gzipped
+`bus/` tiles decompressed (`.json`), so their names and sha256 differ from `manifest.json`.
+
 The geometry itself is in the bucket [alreadyopen/hk-transit](https://huggingface.co/buckets/alreadyopen/hk-transit): bus and
 minibus routes sampled every 20 m with road level and height in 2 km gzipped JSON tiles (`bus/`), and every MTR line with its
 stations, track and over/underground levels (`mtr.json`).
