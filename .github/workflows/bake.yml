@@ -25,7 +25,7 @@ jobs:
       - run: pip install -r requirements.txt
       # downloads kept between runs: the DTM grid (245 MB, built once), bus.py's stop positions (fetched once per new stop) and
       # mtr.py's two GML members per iB5000 sheet (19 MB; a sheet is fetched again only when Lands D revises it)
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
         with:
           path: data/cache
           key: cache-${{ github.run_id }}
@@ -36,6 +36,12 @@ jobs:
           python bus.py
           python mtr.py hk
           python search.py
+      # saved straight after the bake, even when a later step fails (a lost cache costs ~20 min of paced downloads)
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+        if: always()
+        with:
+          path: data/cache
+          key: cache-${{ github.run_id }}
       - name: publish
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -46,4 +52,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add status/last-run.json
           git commit -m "bake $(date -u +%F)" || exit 0
-          git push
+          git pull --rebase -q && git push   # main may have moved during the run
