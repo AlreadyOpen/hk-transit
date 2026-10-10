@@ -22,7 +22,7 @@ def main():
                                       'mtr_stations': sum(len(x['stations']) for x in mtr['lines']), 'stops': n('stops.parquet'),
                                       'routes': n('routes.parquet')}, built)
     manifest.gate(m, f'https://huggingface.co/buckets/{REPO}/resolve/manifest.json')
-    mf = os.path.join(sources.OUT, 'manifest.json'); json.dump(m, open(mf, 'w'), indent=1)
+    mf = os.path.join(hk, 'manifest.json'); json.dump(m, open(mf, 'w'), indent=1)
     api = HfApi()
     api.create_repo(REPO, repo_type='dataset', exist_ok=True)
     api.upload_folder(repo_id=REPO, repo_type='dataset', folder_path=os.path.join(hk, 'search'), path_in_repo='search',
