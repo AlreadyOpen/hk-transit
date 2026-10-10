@@ -37,7 +37,7 @@ jobs:
       - name: publish
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python publish.py | tee status/last-run.json
+        run: mkdir -p status && python publish.py | tee status/last-run.json
       - name: keep-alive commit
         run: |
           git config user.name 'github-actions[bot]'
