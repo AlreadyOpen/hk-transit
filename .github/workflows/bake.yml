@@ -1,4 +1,4 @@
-# Daily bake of Hong Kong's bus and minibus routes and stops, published to Hugging Face (publish.py).
+# Daily bake of Hong Kong's bus, minibus and MTR routes and stops, published to Hugging Face (publish.py).
 # Each run commits status/last-run.json: GitHub turns schedules off after 60 days with no commits.
 name: bake
 on:
@@ -23,7 +23,8 @@ jobs:
           python-version: '3.14'
           cache: pip
       - run: pip install -r requirements.txt
-      # downloads kept between runs: the DTM grid (245 MB, built once) and bus.py's stop positions (fetched once per new stop)
+      # downloads kept between runs: the DTM grid (245 MB, built once), bus.py's stop positions (fetched once per new stop) and
+      # mtr.py's two GML members per iB5000 sheet (19 MB; a sheet is fetched again only when Lands D revises it)
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
         with:
           path: data/cache
@@ -33,6 +34,7 @@ jobs:
         run: |
           python dtm.py 835000 820000
           python bus.py
+          python mtr.py hk
           python search.py
       - name: publish
         env:
