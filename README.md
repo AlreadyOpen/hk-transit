@@ -1,6 +1,6 @@
 # hk-transit
 
-Hong Kong's franchised bus (KMB/LWB, Citybus), green minibus and MTR routes and stops, baked daily from public government data
+Hong Kong's franchised bus (KMB/LWB, Citybus), green minibus, MTR Bus, MTR and Light Rail routes and stops, baked daily from public government data
 and published for browsers to read in place.
 
 Part of [AlreadyOpen](https://github.com/AlreadyOpen): open, re-runnable pipelines over public data.
@@ -9,7 +9,7 @@ Part of [AlreadyOpen](https://github.com/AlreadyOpen): open, re-runnable pipelin
 |---|---|---|
 | Stops and routes (search table) | [huggingface.co/datasets/alreadyopen/hk-transit](https://huggingface.co/datasets/alreadyopen/hk-transit) `search/` | Parquet (ZSTD) + a view-only DuckDB file |
 | Bus and minibus route geometry with road level and height, cut into 2 km tiles | [huggingface.co/buckets/alreadyopen/hk-transit](https://huggingface.co/buckets/alreadyopen/hk-transit) `bus/` | gzipped JSON tiles + `index.json` |
-| MTR lines: stations, track, over/underground levels, heights | same bucket, `mtr.json` | JSON |
+| MTR and Light Rail lines: stations, track, over/underground levels, heights | same bucket, `mtr.json` | JSON |
 
 Both answer CORS and HTTP Range requests, so a web page can read them directly (DuckDB-Wasm for the Parquet, `fetch` +
 `DecompressionStream('gzip')` for the tiles).
@@ -46,9 +46,13 @@ The Government and the relevant organisations own the intellectual property righ
 - The Kowloon Motor Bus Co. (1933) Ltd / Long Win Bus Co. Ltd: routes, route-stops and stops (DATA.GOV.HK)
 - Citybus Ltd: routes, route-stops and stops (DATA.GOV.HK)
 - Lands Department: 5 m Digital Terrain Model (DATA.GOV.HK) and iB5000 topographic map sheets, rail lines and station points (CSDI)
-- MTR Corporation Limited: MTR lines and stations (DATA.GOV.HK)
+- Transport Department: Road Network (2nd Generation) centrelines (DATA.GOV.HK, read from our pinned copy
+  [alreadyopen/hk-roads](https://huggingface.co/datasets/alreadyopen/hk-roads)), used to route MTR Bus lines
+- MTR Corporation Limited: MTR lines and stations, Light Rail routes and stops, MTR Bus and Feeder Bus stops (DATA.GOV.HK)
 
-The outputs are derived from that data (stops snapped to route lines, road levels and heights added, cut into tiles). They are
+The outputs are derived from that data (stops snapped to route lines, road levels and heights added, cut into tiles).
+**MTR Bus lines are our own routing** along TD's road network through each route's stops in order (no route line is
+published for them): an estimate, not MTR's official route geometry. They are
 provided as is, with no warranty, and are not endorsed by the Government or the operators.
 
 Code: Apache-2.0.

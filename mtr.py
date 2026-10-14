@@ -13,6 +13,10 @@ Heights for outside the photomesh: Lands D DTM (dtm.py) every Z_STEP m along eac
 DTM at the track, which includes viaducts; underground the ground above, the page goes below it) and at each station (the
 lowest within 15 m: street level); 'zr' = the rise above the local ground (0 at grade and underground), which the page uses on
 the flat map (Hills off: the imagery lies at 0 m).
+Light Rail (added 2026-10-14; whole HK only): track RailLine FEATURECODE LRT, stops POIPoint LRA ('LR-<name>'), routes and stop
+order from MTR open data light_rail_routes_and_stops.csv (the stop ids the Light Rail next-train API takes); each route
+direction becomes a line 'LR<route>-<direction>' (lr: true). A stop with no LRA point (Hoi Wong Road, 2026-10-14) is put
+halfway between its neighbours and listed in 'approx'.
 Usage: python3 mtr.py <area id>     (centre and radius from out/gis/<area>/index.json; writes mtr.json, adds it to index.json)
        python3 mtr.py hk            (every line and station in HK, all 193 sheets, ~4 GB fetched once: writes gis/hk/mtr.json
                                      and points every area's index.json at it)"""
@@ -23,6 +27,8 @@ import dtm, sources
 
 SHEETS = 'https://portal.csdi.gov.hk/server/rest/services/common/landsd_rcd_1637224243141_96556/FeatureServer/0/query'
 STATIONS = 'https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv'
+LR_STOPS = 'https://opendata.mtr.com.hk/data/light_rail_routes_and_stops.csv'
+LR_COLOR = '#d3a809'
 TO_LL = Transformer.from_crs(2326, 4326, always_xy=True)
 NEAR_M, SNAP_M, STATION_M, Z_STEP = 1500, 3, 250, 20        # stations within radius + 1500 m; track ends within 3 m join; station to track
 COLOR = {'AEL': '#00888e', 'TCL': '#f38b00', 'TML': '#9a3b26', 'TKL': '#7d499d', 'EAL': '#5eb6e4', 'SIL': '#bac429',
@@ -74,30 +80,9 @@ def z_along(coords, levels):
         out.append((None if h is None else round(h, 1), 0 if h is None else round(rise, 1)))
     return out
 
-def main(area):
-    whole = area == 'hk'
-    d = os.path.join(sources.OUT, 'gis', area); os.makedirs(d, exist_ok=True); day = datetime.date.today().isoformat()
-    if whole: E = N = R = None; q = {'where': '1=1'}
-    else:
-        idx = json.load(open(os.path.join(d, 'index.json')))
-        (E, N), R = idx['centre_E_N'], float(idx['radius_m']); far = R + NEAR_M + 2500
-    q = {**q, 'outFields': 'SHEETNO,REVISIONDATE,GML', 'returnGeometry': 'false', 'f': 'json'} if whole else {'geometry': f'{round(E - far)},{round(N - far)},{round(E + far)},{round(N + far)}', 'geometryType': 'esriGeometryEnvelope', 'inSR': 2326,
-         'spatialRel': 'esriSpatialRelIntersects', 'outFields': 'SHEETNO,REVISIONDATE,GML', 'returnGeometry': 'false', 'f': 'json'}
-    sheets = json.load(urllib.request.urlopen(f'{SHEETS}?{urllib.parse.urlencode(q)}', timeout=60))['features']
-    segs, rsn, exits = [], {}, {}
-    for n, s in enumerate(sheets):                                       # fetch first (slow, cached), with progress
-        sheet_members(s['attributes'], day); print(f"sheet {n + 1}/{len(sheets)} {s['attributes']['SHEETNO']}", file=sys.stderr, flush=True)                                       # [(pts, level)], station name -> (E, N) / exit points
-    for s in sheets:
-        m = sheet_members(s['attributes'], day)
-        for g, pts in gml_features(m['Transportation/RailLine.gml'], 'RailLine'):
-            if g('FEATURECODE') == 'MTR' and len(pts) > 1: segs.append((pts, g('DATALEVEL')))
-        for g, pts in gml_features(m['PlacesOfInterest/POIPoint.gml'], 'POIPoint'):
-            nm = re.fullmatch(r'Mass Transit Railway (.+) Station', g('ENGLISHNAME') or '')
-            if g('FEATURECODE') == 'RSN' and nm: rsn[nm.group(1).lower()] = pts[0]
-            ex = re.fullmatch(r'Mass Transit Railway (.+) Station(?:-\S+)? Access', g('ENGLISHNAME') or '')
-            if g('FEATURECODE') == 'MTA' and ex: exits.setdefault(ex.group(1).lower(), []).append(pts[0])
-    for n, ps in exits.items(): rsn.setdefault(n, (sum(p[0] for p in ps) / len(ps), sum(p[1] for p in ps) / len(ps)))
-    # track graph: segment ends snapped to a 3 m grid (neighbouring cells joined), edges keep their geometry and level
+def graph(segs):
+    """track graph of [(pts, level)]: segment ends snapped to a 3 m grid (neighbouring cells joined), edges keep their geometry
+    and level; returns path(srcs, dsts) and near(point) (the track nodes within STATION_M)"""
     key = lambda p: (round(p[0] / SNAP_M), round(p[1] / SNAP_M))
     parent = {}
     def find(k):
@@ -136,14 +121,40 @@ def main(area):
         return out[::-1], b
     nodes = list(at)
     def near(p): return [n for n in nodes if math.dist(at[n], p) <= STATION_M]
+    return path, near
 
+def main(area):
+    whole = area == 'hk'
+    d = os.path.join(sources.OUT, 'gis', area); os.makedirs(d, exist_ok=True); day = datetime.date.today().isoformat()
+    if whole: E = N = R = None; q = {'where': '1=1'}
+    else:
+        idx = json.load(open(os.path.join(d, 'index.json')))
+        (E, N), R = idx['centre_E_N'], float(idx['radius_m']); far = R + NEAR_M + 2500
+    q = {**q, 'outFields': 'SHEETNO,REVISIONDATE,GML', 'returnGeometry': 'false', 'f': 'json'} if whole else {'geometry': f'{round(E - far)},{round(N - far)},{round(E + far)},{round(N + far)}', 'geometryType': 'esriGeometryEnvelope', 'inSR': 2326,
+         'spatialRel': 'esriSpatialRelIntersects', 'outFields': 'SHEETNO,REVISIONDATE,GML', 'returnGeometry': 'false', 'f': 'json'}
+    sheets = json.load(urllib.request.urlopen(f'{SHEETS}?{urllib.parse.urlencode(q)}', timeout=60))['features']
+    segs, rsn, exits, lsegs, lra = [], {}, {}, [], {}
+    for n, s in enumerate(sheets):                                       # fetch first (slow, cached), with progress
+        sheet_members(s['attributes'], day); print(f"sheet {n + 1}/{len(sheets)} {s['attributes']['SHEETNO']}", file=sys.stderr, flush=True)                                       # [(pts, level)], station name -> (E, N) / exit points
+    for s in sheets:
+        m = sheet_members(s['attributes'], day)
+        for g, pts in gml_features(m['Transportation/RailLine.gml'], 'RailLine'):
+            if g('FEATURECODE') == 'MTR' and len(pts) > 1: segs.append((pts, g('DATALEVEL')))
+            if g('FEATURECODE') == 'LRT' and len(pts) > 1: lsegs.append((pts, g('DATALEVEL')))
+        for g, pts in gml_features(m['PlacesOfInterest/POIPoint.gml'], 'POIPoint'):
+            nm = re.fullmatch(r'Mass Transit Railway (.+) Station', g('ENGLISHNAME') or '')
+            if g('FEATURECODE') == 'RSN' and nm: rsn[nm.group(1).lower()] = pts[0]
+            ex = re.fullmatch(r'Mass Transit Railway (.+) Station(?:-\S+)? Access', g('ENGLISHNAME') or '')
+            if g('FEATURECODE') == 'MTA' and ex: exits.setdefault(ex.group(1).lower(), []).append(pts[0])
+            if g('FEATURECODE') == 'LRA' and (g('ENGLISHNAME') or '').startswith('LR-'): lra[g('ENGLISHNAME')[3:].lower()] = pts[0]
+    for n, ps in exits.items(): rsn.setdefault(n, (sum(p[0] for p in ps) / len(ps), sum(p[1] for p in ps) / len(ps)))
+    path, near = graph(segs)
     rows = list(csv.DictReader(io.StringIO(urllib.request.urlopen(STATIONS, timeout=60).read().decode('utf-8-sig'))))
     lines, gaps = [], []
-    for (line, dirn) in sorted({(r['Line Code'], r['Direction']) for r in rows if r['Line Code'] and r['Direction'].endswith('UT')}):
-        st = sorted((r for r in rows if r['Line Code'] == line and r['Direction'] == dirn), key=lambda r: float(r['Sequence']))
-        pos = [rsn.get(r['English Name'].lower()) for r in st]
+    def build(line, branch, color, st, pos, extra={}):
+        """one line from its stations in order (rows with 'Station Code', 'English Name', 'Chinese Name') and their (E, N)"""
         inside = [i for i, p in enumerate(pos) if p and (whole or math.dist(p, (E, N)) <= R + NEAR_M)]
-        if not inside: continue
+        if not inside: return
         i0, i1 = max(0, min(inside) - 1), min(len(st) - 1, max(inside) + 1)
         chain = [(r, p, near(p) if p else []) for r, p in zip(st[i0:i1 + 1], pos[i0:i1 + 1])]
         chain = [c for c in chain if c[2]]
@@ -163,12 +174,27 @@ def main(area):
             if not k: here = n
             zs = dtm.lowest(*p)
             stations.append([r['Station Code'], r['English Name'], r['Chinese Name'], round(m, 1), *(round(c, 6) for c in TO_LL.transform(*p)), None if zs is None else round(zs, 1)])
-        if len(stations) < 2: continue
-        lines.append({'line': line, 'branch': dirn[:-3] or None, 'color': COLOR.get(line, '#888888'), 'stations': stations, 'levels': levels,
+        if len(stations) < 2: return
+        lines.append({'line': line, 'branch': branch, 'color': color, 'stations': stations, 'levels': levels, **extra,
                       'track': [[*(round(c, 6) for c in TO_LL.transform(x, y)), round(mm, 1)] for x, y, mm in coords], **dict(zip(('z', 'zr'), map(list, zip(*z_along(coords, levels)))))})
+    for (line, dirn) in sorted({(r['Line Code'], r['Direction']) for r in rows if r['Line Code'] and r['Direction'].endswith('UT')}):
+        st = sorted((r for r in rows if r['Line Code'] == line and r['Direction'] == dirn), key=lambda r: float(r['Sequence']))
+        build(line, dirn[:-3] or None, COLOR.get(line, '#888888'), st, [rsn.get(r['English Name'].lower()) for r in st])
+    approx = []
+    if whole:                                                            # Light Rail: its own track graph (it joins no MTR track)
+        path, near = graph(lsegs)
+        lr = list(csv.DictReader(io.StringIO(urllib.request.urlopen(LR_STOPS, timeout=60).read().decode('utf-8-sig'))))
+        for r in lr: r['Station Code'] = r['Stop ID']                    # the id the next-train API takes
+        for (route, dirn) in sorted({(r['Line Code'], r['Direction']) for r in lr}):
+            st = sorted((r for r in lr if r['Line Code'] == route and r['Direction'] == dirn), key=lambda r: float(r['Sequence']))
+            pos = [lra.get(r['English Name'].lower()) for r in st]
+            for i, p in enumerate(pos):
+                if p is None and 0 < i < len(pos) - 1 and pos[i - 1] and pos[i + 1]:
+                    pos[i] = ((pos[i - 1][0] + pos[i + 1][0]) / 2, (pos[i - 1][1] + pos[i + 1][1]) / 2); approx.append(st[i]['English Name'])
+            build(f'LR{route}-{dirn}', None, LR_COLOR, st, pos, {'lr': True, 'route': route})
     out = {'area': area, 'built': datetime.datetime.now().isoformat(timespec='seconds'), 'z_step': Z_STEP,
            'source': f"Lands D iB5000 (RailLine, POIPoint) sheets {', '.join(sorted(s['attributes']['SHEETNO'] for s in sheets))} + MTR lines and stations CSV, {day}",
-           'lines': lines, 'gaps': gaps, 'names': {r['Station Code']: [r['English Name'], r['Chinese Name']] for r in rows if r['Station Code']}}   # every code: train destinations
+           'lines': lines, 'gaps': gaps, 'approx': sorted(set(approx)), 'names': {r['Station Code']: [r['English Name'], r['Chinese Name']] for r in rows if r['Station Code']}}   # every code: train destinations
     json.dump(out, open(os.path.join(d, 'mtr.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     if not whole: json.dump(idx | {'layers': idx['layers'] | {'mtr': {'file': f'gis/{area}/mtr.json', 'features': len(lines), 'source': out['source']}}}, open(os.path.join(d, 'index.json'), 'w'), indent=1)
     else:                                                                # every area shows the whole network

@@ -1,4 +1,4 @@
-"""The GIS pages' search index: every bus, minibus and MTR stop with the routes it serves, and every route, as Parquet behind a
+"""The GIS pages' search index: every bus, minibus, MTR bus, MTR and Light Rail stop with the routes it serves, and every route, as Parquet behind a
 view-only DuckDB file (duckdb.org 2026-10-07): out/gis/hk/search/{stops,routes}.parquet and
 search.duckdb, which only holds views naming gis/hk/search/*.parquet. The page attaches it with DuckDB-Wasm on the first
 search (gis/src/places.ts) and reads it by HTTP Range.
@@ -23,6 +23,13 @@ def main():
                 if seq > r['last'][0]: r['last'] = (seq, sid)
     m = os.path.join(hk, 'mtr.json'); mtr = json.load(open(m)) if os.path.exists(m) else {'lines': [], 'names': {}}   # mtr.py is optional
     for l in mtr['lines']:
+        if l.get('lr'):                                                  # Light Rail: one line per route direction (mtr.py), stops by stop id
+            for code, en, tc, _m, lon, lat, *_ in l['stations']:
+                s = stops.setdefault(f'LR-{code}', {'id': f'LR-{code}', 'name_en': f'{en} Stop', 'name_tc': tc, 'co': 'LR', 'lon': lon, 'lat': lat, 'routes': set()})
+                s['routes'].add(f"LR {l['route']}")
+            k = f"LR|{l['route']}|{l['line'].rsplit('-', 1)[1]}"
+            routes.setdefault(k, {'key': k, 'co': 'LR', 'route': l['route'], 'bound': k.rsplit('|', 1)[1], 'dest': l['stations'][-1][1], 'stops': {f'LR-{s[0]}' for s in l['stations']}})
+            continue
         for code, en, tc, _m, lon, lat, *_ in l['stations']:
             s = stops.setdefault(f'MTR-{code}', {'id': f'MTR-{code}', 'name_en': f'{en} Station', 'name_tc': f'{tc}站', 'co': 'MTR', 'lon': lon, 'lat': lat, 'routes': set()})
             s['routes'].add(f"MTR {l['line']}")

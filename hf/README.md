@@ -20,7 +20,7 @@ configs:
 
 # Hong Kong bus, minibus and MTR routes and stops
 
-Every franchised bus (KMB/LWB, Citybus) and green minibus stop and MTR station in Hong Kong with the routes or lines serving it,
+Every franchised bus (KMB/LWB, Citybus), green minibus and MTR Bus stop, MTR station and Light Rail stop in Hong Kong with the routes or lines serving it,
 and every route direction and MTR line, rebuilt daily by [AlreadyOpen/hk-transit](https://github.com/AlreadyOpen/hk-transit).
 
 - `search/stops.parquet`: `id, name_en, name_tc, co, lon, lat, routes` (one row per stop)
@@ -32,7 +32,8 @@ A copy is mirrored to [Kaggle](https://www.kaggle.com/datasets/helenkwok/hk-tran
 
 The geometry itself is in the bucket [alreadyopen/hk-transit](https://huggingface.co/buckets/alreadyopen/hk-transit): bus and
 minibus routes sampled every 20 m with road level and height in 2 km gzipped JSON tiles (`bus/`), and every MTR line with its
-stations, track and over/underground levels (`mtr.json`).
+stations, track and over/underground levels (`mtr.json`, Light Rail included). MTR Bus lines are our own routing along
+TD's road network through each route's stops (no route line is published for them): an estimate, not MTR's route geometry.
 
 ```python
 import duckdb

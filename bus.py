@@ -32,6 +32,9 @@ GMB_LINES = 'https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_16970
 IRN = 'https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_1638949160594_2844/FeatureServer/10/query'
 KMB, CTB = 'https://data.etabus.gov.hk/v1/transport/kmb', 'https://rt.data.gov.hk/v2/transport/citybus'
 TD_GMB = 'https://static.data.gov.hk/td/routes-fares-geojson/JSON_GMB.json'
+MTRB_STOPS = 'https://opendata.mtr.com.hk/data/mtr_bus_stops.csv'
+# alreadyopen/hk-roads (TD Road Network) pinned to one revision (2026-10-14), so a rebuild reads the same centrelines; bump to take a newer bake
+HK_ROADS_REV = '8bd67eb0d44be86329f52e08129b92667b52b303'
 TILE, STEP, X0, Y0 = 2000, 20, 800000, 800000
 SNAP_M, LEVEL_M = 40, 12                       # a stop further than SNAP_M from its line is a mismatch; level search radius
 CTB_PER_S = 5
@@ -118,6 +121,82 @@ def load():
         a = f['attributes']; feats.append((a, f, 'GMB', 'GMB', a['ROUTE_ID'], (str(a['ROUTE_SEQ']),), a['ED_STOP_NAMEE']))
     return feats, order, stops
 
+def centerline():
+    """the pinned hk-roads centerline.parquet, downloaded once (MTR Bus routing; other scripts may read it too)"""
+    import certifi, ssl
+    cache = os.path.join(sources.CACHE, f'hk-roads-centerline-{HK_ROADS_REV[:12]}.parquet')
+    if not os.path.exists(cache):
+        os.makedirs(sources.CACHE, exist_ok=True)
+        url = f'https://huggingface.co/datasets/alreadyopen/hk-roads/resolve/{HK_ROADS_REV}/centerline.parquet'
+        with urllib.request.urlopen(url, context=ssl.create_default_context(cafile=certifi.where())) as r, open(cache + '.part', 'wb') as f: f.write(r.read())
+        os.replace(cache + '.part', cache)
+    return cache
+
+def mtr_bus(stops):
+    """MTR Bus and Feeder Bus (26 routes, 2026-10-14): stops in order from MTR open data (mtr_bus_stops.csv, the ids the
+    getSchedule API answers with); TD publishes no line for them, so each direction's line is routed on TD's road network
+    (centerline(): alreadyopen/hk-roads, TRAVEL_DIRECTION 1 = both ways, 3 = one way along the drawing: the other reading left 39 of 41 directions unroutable) through its stops in order: every
+    stop gets its CAND nearest road points, and the cheapest chain (path metres + PEN x metres off the road) wins (Viterbi).
+    Returns routes like match()'s; each stop's distance comes from the routing itself (match()'s projection would put the first
+    stop of a loop route at its end)."""
+    import csv, duckdb
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import dijkstra
+    from scipy.spatial import cKDTree
+    CAND, PEN, SEG = 6, 3.0, 10.0
+    p = os.path.join(C, DAY, 'mtr_bus_stops.csv')
+    if not os.path.exists(p):
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with urllib.request.urlopen(MTRB_STOPS, timeout=120) as r: open(p + '.part', 'wb').write(r.read())
+        os.replace(p + '.part', p)
+    names, order = {}, {}
+    for r in csv.DictReader(open(p, encoding='utf-8-sig')):
+        order.setdefault(('MTRB', r['REFERENCE_ID'], r['DIRECTION']), []).append((int(float(r['STATION_SEQNO'])), r['STATION_ID']))   # a variant each (K73, K73-1, ...)
+        names[r['REFERENCE_ID']] = r['ROUTE_ID']
+        stops.setdefault(r['STATION_ID'], {'name_en': r['STATION_NAME_ENG'], 'name_tc': r['STATION_NAME_CHI'], 'long': r['STATION_LONGITUDE'], 'lat': r['STATION_LATITUDE'], 'co': 'MTRB'})
+    c = duckdb.connect(); c.execute('INSTALL spatial; LOAD spatial')
+    lines = c.execute(f"""select TRAVEL_DIRECTION, st_astext(st_transform(geometry, 'EPSG:4326', 'EPSG:2326', always_xy := true)) from '{centerline()}'""").fetchall()
+    key, xy, a, b, w = {}, [], [], [], []
+    def node(x, y):
+        k = (round(x, 1), round(y, 1))
+        if k not in key: key[k] = len(xy); xy.append(k)
+        return key[k]
+    for d, wkt in lines:
+        g = shapely.segmentize(shapely.from_wkt(wkt), SEG)
+        for part in getattr(g, 'geoms', [g]):
+            pts = [node(x, y) for x, y in part.coords]
+            for i, j in zip(pts, pts[1:]):
+                L = math.dist(xy[i], xy[j]); a.append(i); b.append(j); w.append(L)
+                if d == '1': a.append(j); b.append(i); w.append(L)
+    xy = np.array(xy); G = coo_matrix((w, (a, b)), shape=(len(xy),) * 2).tocsr(); tree = cKDTree(xy)
+    feats, far = [], 0
+    for (co, ref, bound), seq in sorted((k, v) for k, v in order.items() if k[0] == 'MTRB'):
+        seq = sorted(seq); P = [TO_HK.transform(float(stops[s]['long']), float(stops[s]['lat'])) for _, s in seq]
+        cand = [tree.query(q, CAND) for q in P]                       # (distances, node ids) per stop
+        cost, back = PEN * cand[0][0], []
+        for i in range(1, len(P)):
+            D = dijkstra(G, indices=cand[i - 1][1], limit=max(3000, 4 * math.dist(P[i - 1], P[i])))[:, cand[i][1]]
+            tot = cost[:, None] + D + PEN * cand[i][0][None, :]
+            back.append(tot.argmin(0)); cost = tot.min(0)
+        j = int(cost.argmin())
+        if not np.isfinite(cost[j]): far += 1; continue
+        picks = [j]
+        for bk in reversed(back): picks.append(int(bk[picks[-1]]))
+        picks.reverse(); path, at = [cand[0][1][picks[0]]], [0]
+        for i in range(1, len(P)):
+            s0, t0 = cand[i - 1][1][picks[i - 1]], cand[i][1][picks[i]]
+            _, pred = dijkstra(G, indices=s0, limit=max(3000, 4 * math.dist(P[i - 1], P[i])), return_predecessors=True)
+            leg, n = [], t0
+            while n != s0 and n >= 0: leg.append(n); n = pred[n]
+            path += leg[::-1]; at.append(len(path) - 1)
+        pts = xy[path]; cum = np.r_[0, np.cumsum(np.hypot(*np.diff(pts, axis=0).T))]
+        if len(pts) < 2: far += 1; continue
+        k = f'MTRB|{ref}|{bound}'
+        feats.append({'k': k, 'meta': ['MTRB', names[ref], bound, None, stops[seq[-1][1]]['name_en']], 'line': LineString(pts),
+                      'stops': [(n, sid, float(cum[i])) for (n, sid), i in zip(seq, at)]})
+    print(json.dumps({'mtr_bus_variants': len(feats), 'unroutable': far}), file=sys.stderr, flush=True)
+    return feats
+
 def match(feats, order, stops):
     """each route direction: its whole line and its stops in order along it (the best of TD's drawings when there are several)"""
     best, skipped = {}, []
@@ -164,6 +243,7 @@ def levels(xy, tangent, irn):
 def main():
     feats, order, stops = load()
     routes, skipped = match(feats, order, stops)
+    routes += mtr_bus(stops)
     print(json.dumps({'routes': len(routes), 'skipped': len(skipped)}), file=sys.stderr, flush=True)
     # samples every STEP m along every route, with a tangent for the level search
     for r in routes:
@@ -215,7 +295,7 @@ def main():
     fx, fy = np.linalg.lstsq(A, g[:, 0], rcond=None)[0], np.linalg.lstsq(A, g[:, 1], rcond=None)[0]
     idx = {'built': datetime.datetime.now().isoformat(timespec='seconds'), 'ext': '.json.gz', 'tile_m': TILE, 'origin': [X0, Y0], 'step_m': STEP, 'no_level': NO_LEVEL,
            'to_hk': [list(fx), list(fy)], 'tiles': sizes, 'routes': len(routes), 'skipped': skipped,
-           'source': f'TD Bus Route + Green Minibus Route (CSDI), KMB/LWB, Citybus and GMB route-stop and stop lists, TD IRN levels, Lands D DTM, {DAY}'}
+           'source': f'TD Bus Route + Green Minibus Route (CSDI), KMB/LWB, Citybus and GMB route-stop and stop lists, MTR Bus stops (MTR open data) routed on TD road network, TD IRN levels, Lands D DTM, {DAY}'}
     json.dump(idx, open(os.path.join(out, 'index.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     for a in sorted(os.listdir(os.path.join(sources.OUT, 'gis'))):          # every area shows the whole network
         p = os.path.join(sources.OUT, 'gis', a, 'index.json')
