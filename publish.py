@@ -11,7 +11,7 @@ import duckdb
 from huggingface_hub import HfApi, batch_bucket_files, create_bucket, sync_bucket
 import manifest, sources
 
-REPO = 'alreadyopen/hk-transit'
+REPO = 'milleleaf/hk-transit'
 
 def main():
     hk = os.path.join(sources.OUT, 'gis', 'hk'); built = json.load(open(os.path.join(hk, 'bus', 'index.json')))['built']

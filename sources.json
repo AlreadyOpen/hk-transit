@@ -10,5 +10,5 @@
  {"name": "MTR lines and stations", "owner": "MTR Corporation", "url": "https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "mtr.py"},
  {"name": "MTR Bus & Feeder Bus Stops", "owner": "MTR Corporation", "url": "https://opendata.mtr.com.hk/data/mtr_bus_stops.csv", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "bus.py"},
  {"name": "Light Rail Routes & Stops", "owner": "MTR Corporation", "url": "https://opendata.mtr.com.hk/data/light_rail_routes_and_stops.csv", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "mtr.py"},
- {"name": "Road Network (2nd Generation) centrelines, via alreadyopen/hk-roads (pinned revision)", "owner": "Transport Department", "url": "https://huggingface.co/datasets/alreadyopen/hk-roads", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "bus.py"}
+ {"name": "Road Network (2nd Generation) centrelines, via alreadyopen/hk-roads (pinned revision)", "owner": "Transport Department", "url": "https://huggingface.co/datasets/milleleaf/hk-roads", "licence": "https://data.gov.hk/en/terms-and-conditions", "used_by": "bus.py"}
 ]

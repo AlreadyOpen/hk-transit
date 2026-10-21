@@ -3,12 +3,12 @@
 Hong Kong's franchised bus (KMB/LWB, Citybus), green minibus, MTR Bus, MTR and Light Rail routes and stops, baked daily from public government data
 and published for browsers to read in place.
 
-Part of [AlreadyOpen](https://github.com/AlreadyOpen): open, re-runnable pipelines over public data.
+Part of [AlreadyOpen](https://github.com/milleleaf): open, re-runnable pipelines over public data.
 
 | Output | Where | Format |
 |---|---|---|
-| Stops and routes (search table) | [huggingface.co/datasets/alreadyopen/hk-transit](https://huggingface.co/datasets/alreadyopen/hk-transit) `search/` | Parquet (ZSTD) + a view-only DuckDB file |
-| Bus and minibus route geometry with road level and height, cut into 2 km tiles | [huggingface.co/buckets/alreadyopen/hk-transit](https://huggingface.co/buckets/alreadyopen/hk-transit) `bus/` | gzipped JSON tiles + `index.json` |
+| Stops and routes (search table) | [huggingface.co/datasets/milleleaf/hk-transit](https://huggingface.co/datasets/milleleaf/hk-transit) `search/` | Parquet (ZSTD) + a view-only DuckDB file |
+| Bus and minibus route geometry with road level and height, cut into 2 km tiles | [huggingface.co/buckets/milleleaf/hk-transit](https://huggingface.co/buckets/milleleaf/hk-transit) `bus/` | gzipped JSON tiles + `index.json` |
 | MTR and Light Rail lines: stations, track, over/underground levels, heights | same bucket, `mtr.json` | JSON |
 
 Both answer CORS and HTTP Range requests, so a web page can read them directly (DuckDB-Wasm for the Parquet, `fetch` +
@@ -47,7 +47,7 @@ The Government and the relevant organisations own the intellectual property righ
 - Citybus Ltd: routes, route-stops and stops (DATA.GOV.HK)
 - Lands Department: 5 m Digital Terrain Model (DATA.GOV.HK) and iB5000 topographic map sheets, rail lines and station points (CSDI)
 - Transport Department: Road Network (2nd Generation) centrelines (DATA.GOV.HK, read from our pinned copy
-  [alreadyopen/hk-roads](https://huggingface.co/datasets/alreadyopen/hk-roads)), used to route MTR Bus lines
+  [alreadyopen/hk-roads](https://huggingface.co/datasets/milleleaf/hk-roads)), used to route MTR Bus lines
 - MTR Corporation Limited: MTR lines and stations, Light Rail routes and stops, MTR Bus and Feeder Bus stops (DATA.GOV.HK)
 
 The outputs are derived from that data (stops snapped to route lines, road levels and heights added, cut into tiles).

@@ -21,7 +21,7 @@ configs:
 # Hong Kong bus, minibus and MTR routes and stops
 
 Every franchised bus (KMB/LWB, Citybus), green minibus and MTR Bus stop, MTR station and Light Rail stop in Hong Kong with the routes or lines serving it,
-and every route direction and MTR line, rebuilt daily by [AlreadyOpen/hk-transit](https://github.com/AlreadyOpen/hk-transit).
+and every route direction and MTR line, rebuilt daily by [AlreadyOpen/hk-transit](https://github.com/milleleaf/hk-transit).
 
 - `search/stops.parquet`: `id, name_en, name_tc, co, lon, lat, routes` (one row per stop)
 - `search/routes.parquet`: `key, co, route, bound, dest, stops, lon, lat` (one row per route direction; lon/lat = middle of its stops)
@@ -30,7 +30,7 @@ and every route direction and MTR line, rebuilt daily by [AlreadyOpen/hk-transit
 A copy is mirrored to [Kaggle](https://www.kaggle.com/datasets/helenkwok/hk-transit) after every bake; Kaggle stores the gzipped
 `bus/` tiles decompressed (`.json`), so their names and sha256 differ from `manifest.json`.
 
-The geometry itself is in the bucket [alreadyopen/hk-transit](https://huggingface.co/buckets/alreadyopen/hk-transit): bus and
+The geometry itself is in the bucket [alreadyopen/hk-transit](https://huggingface.co/buckets/milleleaf/hk-transit): bus and
 minibus routes sampled every 20 m with road level and height in 2 km gzipped JSON tiles (`bus/`), and every MTR line with its
 stations, track and over/underground levels (`mtr.json`, Light Rail included). MTR Bus lines are our own routing along
 TD's road network through each route's stops (no route line is published for them): an estimate, not MTR's route geometry.
