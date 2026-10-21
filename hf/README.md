@@ -21,7 +21,7 @@ configs:
 # Hong Kong bus, minibus and MTR routes and stops
 
 Every franchised bus (KMB/LWB, Citybus), green minibus and MTR Bus stop, MTR station and Light Rail stop in Hong Kong with the routes or lines serving it,
-and every route direction and MTR line, rebuilt daily by [AlreadyOpen/hk-transit](https://github.com/milleleaf/hk-transit).
+and every route direction and MTR line, rebuilt daily by [milleleaf/hk-transit](https://github.com/milleleaf/hk-transit).
 
 - `search/stops.parquet`: `id, name_en, name_tc, co, lon, lat, routes` (one row per stop)
 - `search/routes.parquet`: `key, co, route, bound, dest, stops, lon, lat` (one row per route direction; lon/lat = middle of its stops)
