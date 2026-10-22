@@ -33,7 +33,7 @@ IRN = 'https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_16389491605
 KMB, CTB = 'https://data.etabus.gov.hk/v1/transport/kmb', 'https://rt.data.gov.hk/v2/transport/citybus'
 TD_GMB = 'https://static.data.gov.hk/td/routes-fares-geojson/JSON_GMB.json'
 MTRB_STOPS = 'https://opendata.mtr.com.hk/data/mtr_bus_stops.csv'
-# alreadyopen/hk-roads (TD Road Network) pinned to one revision (2026-10-14), so a rebuild reads the same centrelines; bump to take a newer bake
+# milleleaf/hk-roads (TD Road Network) pinned to one revision (2026-10-14), so a rebuild reads the same centrelines; bump to take a newer bake
 HK_ROADS_REV = '8bd67eb0d44be86329f52e08129b92667b52b303'
 TILE, STEP, X0, Y0 = 2000, 20, 800000, 800000
 SNAP_M, LEVEL_M = 40, 12                       # a stop further than SNAP_M from its line is a mismatch; level search radius
@@ -135,7 +135,7 @@ def centerline():
 def mtr_bus(stops):
     """MTR Bus and Feeder Bus (26 routes, 2026-10-14): stops in order from MTR open data (mtr_bus_stops.csv, the ids the
     getSchedule API answers with); TD publishes no line for them, so each direction's line is routed on TD's road network
-    (centerline(): alreadyopen/hk-roads, TRAVEL_DIRECTION 1 = both ways, 3 = one way along the drawing: the other reading left 39 of 41 directions unroutable) through its stops in order: every
+    (centerline(): milleleaf/hk-roads, TRAVEL_DIRECTION 1 = both ways, 3 = one way along the drawing: the other reading left 39 of 41 directions unroutable) through its stops in order: every
     stop gets its CAND nearest road points, and the cheapest chain (path metres + PEN x metres off the road) wins (Viterbi).
     Returns routes like match()'s; each stop's distance comes from the routing itself (match()'s projection would put the first
     stop of a loop route at its end)."""

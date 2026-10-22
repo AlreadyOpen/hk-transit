@@ -1,6 +1,6 @@
 """Publish the bakes to Hugging Face (needs HF_TOKEN with write access to the alreadyopen org):
-  dataset alreadyopen/hk-transit  search/{stops,routes}.parquet + search.duckdb, and the card (hf/README.md); one commit a run
-  bucket  alreadyopen/hk-transit  bus/: the gzipped 2 km tiles + index.json, synced (tiles no longer baked are deleted);
+  dataset milleleaf/hk-transit  search/{stops,routes}.parquet + search.duckdb, and the card (hf/README.md); one commit a run
+  bucket  milleleaf/hk-transit  bus/: the gzipped 2 km tiles + index.json, synced (tiles no longer baked are deleted);
                                   mtr.json: every MTR line with its stations, track, levels and heights
                                   manifest.json: sha256 of every file, counts, sources (also in the dataset)
 Nothing is uploaded unless the publish gate passes (manifest.py: no count drops > 10% against the published manifest).

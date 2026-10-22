@@ -30,14 +30,14 @@ and every route direction and MTR line, rebuilt daily by [milleleaf/hk-transit](
 A copy is mirrored to [Kaggle](https://www.kaggle.com/datasets/helenkwok/hk-transit) after every bake; Kaggle stores the gzipped
 `bus/` tiles decompressed (`.json`), so their names and sha256 differ from `manifest.json`.
 
-The geometry itself is in the bucket [alreadyopen/hk-transit](https://huggingface.co/buckets/milleleaf/hk-transit): bus and
+The geometry itself is in the bucket [milleleaf/hk-transit](https://huggingface.co/buckets/milleleaf/hk-transit): bus and
 minibus routes sampled every 20 m with road level and height in 2 km gzipped JSON tiles (`bus/`), and every MTR line with its
 stations, track and over/underground levels (`mtr.json`, Light Rail included). MTR Bus lines are our own routing along
 TD's road network through each route's stops (no route line is published for them): an estimate, not MTR's route geometry.
 
 ```python
 import duckdb
-duckdb.sql("SELECT co, count(*) FROM 'hf://datasets/alreadyopen/hk-transit/search/stops.parquet' GROUP BY co")
+duckdb.sql("SELECT co, count(*) FROM 'hf://datasets/milleleaf/hk-transit/search/stops.parquet' GROUP BY co")
 ```
 
 ## Sources and terms
