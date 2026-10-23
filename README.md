@@ -8,7 +8,7 @@ Part of [Milleleaf](https://github.com/milleleaf): open, re-runnable pipelines o
 | Output | Where | Format |
 |---|---|---|
 | Stops and routes (search table) | [huggingface.co/datasets/milleleaf/hk-transit](https://huggingface.co/datasets/milleleaf/hk-transit) `search/` | Parquet (ZSTD) + a view-only DuckDB file |
-| Bus and minibus route geometry with road level and height, cut into 2 km tiles | [huggingface.co/buckets/milleleaf/hk-transit](https://huggingface.co/buckets/milleleaf/hk-transit) `bus/` | gzipped JSON tiles + `index.json` |
+| Bus and minibus route geometry with road level and height, cut into 2 km tiles | [huggingface.co/buckets/milleleaf/hk-transit](https://huggingface.co/buckets/milleleaf/hk-transit) `bus/` | gzipped JSON tiles + `index.json`, and `skipped.json` (route directions with no line: why, and their stops in order) |
 | MTR and Light Rail lines: stations, track, over/underground levels, heights | same bucket, `mtr.json` | JSON |
 
 Both answer CORS and HTTP Range requests, so a web page can read them directly (DuckDB-Wasm for the Parquet, `fetch` +

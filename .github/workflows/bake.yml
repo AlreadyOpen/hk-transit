@@ -28,6 +28,7 @@ jobs:
           python-version: '3.14'
           cache: pip
       - run: pip install -r requirements.txt
+      - run: python bus.py test
       # downloads kept between runs: the DTM grid (245 MB, built once), bus.py's stop positions (fetched once per new stop) and
       # mtr.py's two GML members per iB5000 sheet (19 MB; a sheet is fetched again only when Lands D revises it)
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0

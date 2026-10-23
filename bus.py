@@ -38,6 +38,7 @@ HK_ROADS_REV = '8bd67eb0d44be86329f52e08129b92667b52b303'
 TILE, STEP, X0, Y0 = 2000, 20, 800000, 800000
 SNAP_M, LEVEL_M = 40, 12                       # a stop further than SNAP_M from its line is a mismatch; level search radius
 CTB_PER_S = 5
+MAX_OFF = 0.02                                  # the bake stops when more drawn route directions than this have their stops off the line
 NO_LEVEL = -9
 TO_HK, TO_LL = Transformer.from_crs(4326, 2326, always_xy=True), Transformer.from_crs(2326, 4326, always_xy=True)
 DAY = datetime.date.today().isoformat()
@@ -197,30 +198,58 @@ def mtr_bus(stops):
     print(json.dumps({'mtr_bus_variants': len(feats), 'unroutable': far}), file=sys.stderr, flush=True)
     return feats
 
+def snap(line, seq, hk):
+    """each stop's place along the line, in order: [(n, stop id, metres along)] and how many stops fit nowhere. Every pass of
+    the line within SNAP_M of a stop is a candidate (the nearest point of each run of SAMPLE m samples about that close),
+    and the chain in order that keeps the most stops, then lies nearest, wins. Taking each stop's nearest point beyond the
+    previous one instead dropped whole routes: a loop starts where it ends (KMB 10's first stop went to the end of the line)
+    and a stop near a later pass along the same road (the way back) jumped there, leaving every stop before it behind."""
+    SAMPLE = 5.0
+    s = np.minimum(np.arange(0, line.length + SAMPLE, SAMPLE), line.length); q = shapely.get_coordinates(shapely.line_interpolate_point(line, s))
+    pos, score, back = np.zeros(0), np.zeros(0), []                    # every candidate so far: metres along, chain score, (prev, n, sid, d)
+    for n, sid in seq:
+        p = hk.get(sid)
+        if p is None: continue
+        d = np.hypot(q[:, 0] - p.x, q[:, 1] - p.y); near = np.r_[False, d <= SNAP_M + SAMPLE, False]
+        runs = np.flatnonzero(near[1:] != near[:-1]).reshape(-1, 2)    # [start, end) of each run of near samples
+        new = []
+        for i0, i1 in runs:
+            piece = substring(line, max(s[i0] - SAMPLE, 0), min(s[i1 - 1] + SAMPLE, line.length))
+            at = piece.project(p) + max(s[i0] - SAMPLE, 0); dd = line.interpolate(at).distance(p)
+            if dd > SNAP_M: continue
+            ok = pos <= at; j = int(np.argmax(np.where(ok, score, -np.inf))) if ok.any() else -1
+            sc = (score[j] if j >= 0 else 0) + 1e6 - dd                # one more stop beats any distance; then nearest
+            new.append((at, sc, (j, n, sid, at)))
+        if new: pos, score = np.r_[pos, [x[0] for x in new]], np.r_[score, [x[1] for x in new]]; back += [x[2] for x in new]
+    out, j = [], int(np.argmax(score)) if len(score) else -1
+    while j >= 0: j, n, sid, at = back[j]; out.append((n, sid, float(at)))
+    return out[::-1], len(seq) - len(out)
+
 def match(feats, order, stops):
     """each route direction: its whole line and its stops in order along it (the best of TD's drawings when there are several)"""
-    best, skipped = {}, []
+    best, skipped, why, done = {}, [], {}, set()                                   # why: (co, key, bound) -> why its last drawing failed
     hk = {s: Point(*TO_HK.transform(float(st['long']), float(st['lat']))) for s, st in stops.items()}
     for a, f, label, co, key, bounds, dest in feats:
-        line = LineString([tuple(p[:2]) for path in f['geometry']['paths'] for p in path])
-        def snap(seq):                                                   # in order, each beyond the previous (a route can pass a road twice)
-            at, prev, bad = [], 0.0, 0
-            for n, sid in seq:
-                p = hk.get(sid)
-                if p is None: bad += 1; continue
-                rest = substring(line, prev, line.length); dd = prev + rest.project(p) if rest.geom_type == 'LineString' else line.length
-                if line.interpolate(dd).distance(p) > SNAP_M: bad += 1; continue
-                at.append((n, sid, dd)); prev = dd
-            return at, bad
+        line = LineString([tuple(p[:2]) for path in f['geometry']['paths'] for p in path])   # TD's parts join end to start (checked: all 2154)
         tries = [(b, sorted(order.get((co, key, b), []))) for b in bounds]
-        tries = [(b, seq, *snap(seq)) for b, seq in tries if seq]
+        tries = [(b, seq, *snap(line, seq, hk)) for b, seq in tries if seq]
         name = a.get('ROUTE_NAMEE') or a.get('ROUTE_NAME')
-        if not tries: skipped.append(f'{label} {name}: no stop list'); continue
+        if not tries: skipped.append({'k': f'{label}|{key}|', 'meta': [label, name, None, key if co == 'GMB' else None, dest], 'why': 'TD line, no stop list', 'stops': []}); continue
         bound, seq, at, bad = min(tries, key=lambda t: t[3] / len(t[1]))
-        if len(at) < 2 or bad > len(seq) // 4: skipped.append(f'{label} {name}{bound}: {bad} of {len(seq)} stops off the line'); continue
+        if len(at) < 2 or bad > len(seq) // 4:
+            why[(co, key, bound)] = (label, name, dest, f'{bad} of {len(seq)} stops off the line'); continue
         k = f'{label}|{key}|{bound}'
         if k in best and best[k][0] <= (bad, -len(at)): continue
-        best[k] = ((bad, -len(at)), {'k': k, 'meta': [label, name, bound, key if co == 'GMB' else None, dest], 'line': line, 'stops': at})
+        done.add((co, key, bound)); best[k] = ((bad, -len(at)), {'k': k, 'meta': [label, name, bound, key if co == 'GMB' else None, dest], 'line': line, 'stops': at})
+    # every direction with a stop list but no line is still published, stops only (bus/skipped.json, and search.py lists it):
+    # why it has no line, its stops in order
+    for (co, key, bound), seq in sorted(order.items()):
+        if co == 'MTRB' or (co, key, bound) in done: continue
+        label, name, dest, w = why.get((co, key, bound), (co, str(key), None, 'no TD line'))
+        skipped.append({'k': f'{label}|{key}|{bound}', 'meta': [label, name, bound, key if co == 'GMB' else None, dest], 'why': w,
+                        'stops': [[n, sid] + ([stops[sid]['name_en'], stops[sid]['name_tc'], round(float(stops[sid]['long']), 6), round(float(stops[sid]['lat']), 6), stops[sid]['co']] if sid in stops else []) for n, sid in sorted(seq)]})
+    off = len(set(why) - done)                                          # TD draws them, but the stops do not fit the drawing
+    if off > MAX_OFF * (len(done) + off): sys.exit(f'bus: {off} of {len(done) + off} drawn route directions have their stops off the line (more than {MAX_OFF:.0%}): not baking')
     return [r for _, r in best.values()], skipped
 
 def levels(xy, tangent, irn):
@@ -294,9 +323,10 @@ def main():
     ll = np.array([TO_LL.transform(x, y) for x, y in g]); A = np.c_[np.ones(len(ll)), ll]
     fx, fy = np.linalg.lstsq(A, g[:, 0], rcond=None)[0], np.linalg.lstsq(A, g[:, 1], rcond=None)[0]
     idx = {'built': datetime.datetime.now().isoformat(timespec='seconds'), 'ext': '.json.gz', 'tile_m': TILE, 'origin': [X0, Y0], 'step_m': STEP, 'no_level': NO_LEVEL,
-           'to_hk': [list(fx), list(fy)], 'tiles': sizes, 'routes': len(routes), 'skipped': skipped,
+           'to_hk': [list(fx), list(fy)], 'tiles': sizes, 'routes': len(routes), 'skipped': [f"{x['k']}: {x['why']}" for x in skipped],
            'source': f'TD Bus Route + Green Minibus Route (CSDI), KMB/LWB, Citybus and GMB route-stop and stop lists, MTR Bus stops (MTR open data) routed on TD road network, TD IRN levels, Lands D DTM, {DAY}'}
     json.dump(idx, open(os.path.join(out, 'index.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
+    json.dump(skipped, open(os.path.join(out, 'skipped.json'), 'w'), ensure_ascii=False, separators=(',', ':'))   # the full list, out of the page's index
     for a in sorted(os.listdir(os.path.join(sources.OUT, 'gis'))):          # every area shows the whole network
         p = os.path.join(sources.OUT, 'gis', a, 'index.json')
         if a == 'hk' or not os.path.exists(p): continue
@@ -304,5 +334,15 @@ def main():
         json.dump(ix, open(p, 'w'), indent=1)
     print(json.dumps({'routes': len(routes), 'tiles': len(tiles), 'MB': round(sum(sizes.values()) / 1e6, 1), 'largest_kB': round(max(sizes.values()) / 1e3), 'skipped': len(skipped)}))
 
+def test():
+    """snap() on a loop that goes out and back along one road 20 m apart (KMB 10's shape): every stop in order, none lost"""
+    line = LineString([(0, 0), (1000, 0), (1000, 20), (0, 20), (0, 0)])
+    hk = {'a': Point(0, -5), 'b': Point(500, -5), 'c': Point(500, 25), 'd': Point(2, -3)}
+    at, bad = snap(line, [(1, 'a'), (2, 'b'), (3, 'c'), (4, 'd')], hk)
+    assert bad == 0 and [round(d) for _, _, d in at] == [0, 500, 1520, 2040], at
+    at, bad = snap(line, [(1, 'b'), (2, 'zz'), (3, 'a')], hk)            # an unknown stop is off; a stop also at the start fits at the end
+    assert bad == 1 and [s for _, s, _ in at] == ['b', 'a'], at
+    print('bus: self-test ok')
+
 if __name__ == '__main__':
-    main()
+    test() if sys.argv[1:] == ['test'] else main()

@@ -21,6 +21,16 @@ def main():
             for seq, sid, _d in pc['stops']:
                 stops[sid]['routes'].add(f'{co} {name}'); r['stops'].add(sid)
                 if seq > r['last'][0]: r['last'] = (seq, sid)
+    sk = os.path.join(hk, 'bus', 'skipped.json')
+    for x in json.load(open(sk)) if os.path.exists(sk) else []:          # route directions with no line (bus.py): stops only
+        if not x['stops']: continue
+        co, name, bound, gid, dest = x['meta']
+        r = routes.setdefault(x['k'], {'key': x['k'], 'co': co, 'route': name, 'bound': bound, 'dest': dest, 'stops': set(), 'last': (-1, None), 'line': False})
+        for seq, sid, *st in x['stops']:
+            if st: stops.setdefault(sid, {'id': sid, 'name_en': st[0], 'name_tc': st[1], 'co': st[4], 'lon': st[2], 'lat': st[3], 'routes': set()})
+            if sid not in stops: continue
+            stops[sid]['routes'].add(f'{co} {name}'); r['stops'].add(sid)
+            if seq > r['last'][0]: r['last'] = (seq, sid)
     m = os.path.join(hk, 'mtr.json'); mtr = json.load(open(m)) if os.path.exists(m) else {'lines': [], 'names': {}}   # mtr.py is optional
     for l in mtr['lines']:
         if l.get('lr'):                                                  # Light Rail: one line per route direction (mtr.py), stops by stop id
@@ -42,7 +52,7 @@ def main():
         if not r['dest'] and r.get('last', (0, None))[1] in stops: r['dest'] = stops[r['last'][1]]['name_en']   # buses: the last stop
         pts = [stops[s] for s in r['stops'] if s in stops]
         if not pts: continue
-        rrows.append({**{k: r[k] for k in ('key', 'co', 'route', 'bound', 'dest')}, 'stops': len(pts),
+        rrows.append({**{k: r[k] for k in ('key', 'co', 'route', 'bound', 'dest')}, 'stops': len(pts), 'line': r.get('line', True),
                       'lon': round(sum(p['lon'] for p in pts) / len(pts), 6), 'lat': round(sum(p['lat'] for p in pts) / len(pts), 6)})
     c = duckdb.connect()
     for name, rows in (('stops', srows), ('routes', rrows)):

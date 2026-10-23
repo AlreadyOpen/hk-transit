@@ -24,7 +24,7 @@ Every franchised bus (KMB/LWB, Citybus), green minibus and MTR Bus stop, MTR sta
 and every route direction and MTR line, rebuilt daily by [milleleaf/hk-transit](https://github.com/milleleaf/hk-transit).
 
 - `search/stops.parquet`: `id, name_en, name_tc, co, lon, lat, routes` (one row per stop)
-- `search/routes.parquet`: `key, co, route, bound, dest, stops, lon, lat` (one row per route direction; lon/lat = middle of its stops)
+- `search/routes.parquet`: `key, co, route, bound, dest, stops, line, lon, lat` (one row per route direction; lon/lat = middle of its stops; `line` false = stops only: TD draws no line for it, or its stops do not fit TD's line; each is listed with the reason and its stops in order in the bucket's `bus/skipped.json`)
 - `search/search.duckdb`: a view-only DuckDB file over the two Parquet files
 
 A copy is mirrored to [Kaggle](https://www.kaggle.com/datasets/helenkwok/hk-transit) after every bake; Kaggle stores the gzipped
